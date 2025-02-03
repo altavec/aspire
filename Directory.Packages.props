@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup Label="Analyzers">
-    <GlobalPackageReference Include="Altavec.DotNet.CodingStandard" Version="1.0.55" />
-    <GlobalPackageReference Include="Altavec.SemanticVersioning.MSBuild" Version="2.1.7" />
+    <GlobalPackageReference Include="Altavec.DotNet.CodingStandard" Version="1.0.59" />
+    <GlobalPackageReference Include="Altavec.SemanticVersioning.MSBuild" Version="2.1.8" />
   </ItemGroup>
 
 </Project>
