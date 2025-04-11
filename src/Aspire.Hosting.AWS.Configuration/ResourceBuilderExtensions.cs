@@ -6,7 +6,6 @@
 
 namespace Aspire.Hosting;
 
-using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -36,19 +35,21 @@ public static partial class ResourceBuilderExtensions
         // add the configuration to the resource
         _ = builder.Eventing.Subscribe<BeforeStartEvent>((_, _) =>
         {
-            if (profiles.Resource.TryGetLastAnnotation<AWSConfigurationFileAnnotation>(out var annotation)
-                && annotation.FileName is { } fileName)
+            if (!profiles.Resource.TryGetLastAnnotation<AWSConfigurationFileAnnotation>(out var annotation)
+                || annotation.FileName is not { } fileName)
             {
-                // set the AWS Profiles location
-                Amazon.AWSConfigs.AWSProfilesLocation = fileName;
-
-                // set the environment variable
-                Environment.SetEnvironmentVariable(Amazon.Runtime.CredentialManagement.SharedCredentialsFile.SharedCredentialsFileEnvVar, fileName, EnvironmentVariableTarget.Process);
-                RefreshEnvironmentVariables(builder.Configuration);
-
-                // set the profiles location for the .NET setup
-                _ = builder.Configuration.AddInMemoryCollection([new KeyValuePair<string, string?>("AWS:ProfilesLocation", fileName)]);
+                return Task.CompletedTask;
             }
+
+            // set the AWS Profiles location
+            Amazon.AWSConfigs.AWSProfilesLocation = fileName;
+
+            // set the environment variable
+            Environment.SetEnvironmentVariable(Amazon.Runtime.CredentialManagement.SharedCredentialsFile.SharedCredentialsFileEnvVar, fileName, EnvironmentVariableTarget.Process);
+            RefreshEnvironmentVariables(builder.Configuration);
+
+            // set the profiles location for the .NET setup
+            _ = builder.Configuration.AddInMemoryCollection([new KeyValuePair<string, string?>("AWS:ProfilesLocation", fileName)]);
 
             return Task.CompletedTask;
         });
@@ -62,7 +63,7 @@ public static partial class ResourceBuilderExtensions
     /// <param name="builder">The builder.</param>
     /// <param name="configuration">The configuration.</param>
     /// <returns>The application builder.</returns>
-    public static IDistributedApplicationBuilder SetAWSConfig(this IDistributedApplicationBuilder builder, Aspire.Hosting.AWS.IAWSSDKConfig configuration)
+    public static IDistributedApplicationBuilder SetAWSConfig(this IDistributedApplicationBuilder builder, AWS.IAWSSDKConfig configuration)
     {
         var dictionary = new Dictionary<string, string?>(StringComparer.Ordinal);
 
@@ -140,7 +141,7 @@ public static partial class ResourceBuilderExtensions
                 var logger = rls.GetLogger(configuration);
 
                 var fileName = fileAnnotation.FileName;
-                if (!System.IO.Path.Exists(fileName))
+                if (!Path.Exists(fileName))
                 {
                     LogCreatingAwsConfiguration(logger, fileName);
                     var sharedCredentialsFile = new Amazon.Runtime.CredentialManagement.SharedCredentialsFile(fileName);
@@ -194,9 +195,9 @@ public static partial class ResourceBuilderExtensions
         where T : IResourceWithEnvironment
     {
         // add the configuration to the resource
-        if (configuration.Annotations.OfType<AWSConfigurationFileAnnotation>().FirstOrDefault() is { } fileAnnotaion)
+        if (configuration.Annotations.OfType<AWSConfigurationFileAnnotation>().FirstOrDefault() is { } fileAnnotation)
         {
-            _ = builder.WithEnvironment(callback => callback.EnvironmentVariables[Amazon.Runtime.CredentialManagement.SharedCredentialsFile.SharedCredentialsFileEnvVar] = fileAnnotaion.FileName);
+            _ = builder.WithEnvironment(callback => callback.EnvironmentVariables[Amazon.Runtime.CredentialManagement.SharedCredentialsFile.SharedCredentialsFileEnvVar] = fileAnnotation.FileName);
         }
 
         return builder;
@@ -219,11 +220,11 @@ public static partial class ResourceBuilderExtensions
         }
     }
 
-    private sealed class AWSConfigurationFileAnnotation(AWS.IAWSProfileConfig profileConfig) : ApplicationModel.IResourceAnnotation
+    private sealed class AWSConfigurationFileAnnotation(AWS.IAWSProfileConfig profileConfig) : IResourceAnnotation
     {
-        private string? fileName;
-
-        public string FileName => this.fileName ??= this.GetFileName();
+        [field: System.Diagnostics.CodeAnalysis.AllowNull]
+        [field: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public string FileName => field ??= this.GetFileName();
 
         private string GetFileName()
         {
@@ -232,7 +233,7 @@ public static partial class ResourceBuilderExtensions
             static string ConvertHashToString(int hash)
             {
                 var bytes = BitConverter.GetBytes(hash);
-                return System.Convert.ToHexString(bytes).Replace("-", string.Empty, StringComparison.Ordinal);
+                return Convert.ToHexString(bytes).Replace("-", string.Empty, StringComparison.Ordinal);
             }
         }
     }

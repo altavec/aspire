@@ -6,7 +6,6 @@
 
 namespace Aspire.Hosting;
 
-using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -130,59 +129,67 @@ public static partial class ResourceBuilderExtensions
 
                 foreach (var annotation in evt.Resource.Annotations.OfType<BucketAnnotation>())
                 {
-                    var (bucketName, queue, eventTypes) = annotation;
+                    var (annotationBucketName, annotationQueue, annotationEventTypes) = annotation;
 
                     // ensure the bucket exists
-                    LogCheckBucketExists(logger, bucketName);
-                    var bucketExists = await Amazon.S3.Util.AmazonS3Util.DoesS3BucketExistV2Async(client, bucketName).ConfigureAwait(false);
+                    LogCheckBucketExists(logger, annotationBucketName);
+                    var bucketExists = await Amazon.S3.Util.AmazonS3Util.DoesS3BucketExistV2Async(client, annotationBucketName).ConfigureAwait(false);
                     if (!bucketExists)
                     {
-                        LogCreatingBucket(logger, bucketName);
+                        LogCreatingBucket(logger, annotationBucketName);
                         try
                         {
-                            await client.EnsureBucketExistsAsync(bucketName).ConfigureAwait(false);
+                            await client.EnsureBucketExistsAsync(annotationBucketName).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
-                            LogFailedBucketCreation(logger, bucketName, ex);
+                            LogFailedBucketCreation(logger, annotationBucketName, ex);
                             throw;
                         }
                     }
 
-                    if (queue is not null && eventTypes is { Count: not 0 })
+                    if (annotationQueue is null || annotationEventTypes is not { Count: not 0 })
                     {
-                        var queueName = queue.Resource.Value;
+                        continue;
+                    }
 
-                        // ensure the bucket notifications exist
-                        LogCheckBucketNotificationExists(logger, bucketName, queueName, eventTypes);
-                        var notifications = await client.GetBucketNotificationAsync(bucketName, cancellationToken).ConfigureAwait(false);
-                        if (notifications?.QueueConfigurations is not { } queueConfigurations
-                            || queueConfigurations.TrueForAll(q => !q.Queue.Equals(queueName, StringComparison.Ordinal) || !q.Events.SequenceEqual(eventTypes)))
-                        {
-                            LogCreatingBucketNotification(logger, bucketName, queueName, eventTypes);
-                            var putBucketNotificationRequest = new Amazon.S3.Model.PutBucketNotificationRequest
-                            {
-                                BucketName = bucketName,
-                                QueueConfigurations =
-                                [
-                                    new Amazon.S3.Model.QueueConfiguration
-                                    {
-                                        Queue = queueName,
-                                        Events = eventTypes,
-                                    },
-                                ],
-                            };
+                    var queueName = annotationQueue.Resource.Value;
 
-                            try
+                    // ensure the bucket notifications exist
+                    LogCheckBucketNotificationExists(logger, annotationBucketName, queueName, annotationEventTypes);
+                    var notifications = await client.GetBucketNotificationAsync(annotationBucketName, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (notifications?.QueueConfigurations is { } queueConfigurations
+                        && !queueConfigurations.TrueForAll(q =>
+                            !q.Queue.Equals(queueName, StringComparison.Ordinal) ||
+                            !q.Events.SequenceEqual(annotationEventTypes)))
+                    {
+                        continue;
+                    }
+
+                    LogCreatingBucketNotification(logger, annotationBucketName, queueName, annotationEventTypes);
+                    var putBucketNotificationRequest = new Amazon.S3.Model.PutBucketNotificationRequest
+                    {
+                        BucketName = annotationBucketName,
+                        QueueConfigurations =
+                        [
+                            new Amazon.S3.Model.QueueConfiguration
                             {
-                                _ = await client.PutBucketNotificationAsync(putBucketNotificationRequest, cancellationToken).ConfigureAwait(false);
-                            }
-                            catch (Exception ex)
-                            {
-                                LogFailedBucketNotificationCreation(logger, bucketName, queueName, eventTypes, ex);
-                                throw;
-                            }
-                        }
+                                Queue = queueName,
+                                Events = annotationEventTypes,
+                            },
+                        ],
+                    };
+
+                    try
+                    {
+                        _ = await client.PutBucketNotificationAsync(putBucketNotificationRequest, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogFailedBucketNotificationCreation(logger, annotationBucketName, queueName, annotationEventTypes, ex);
+                        throw;
                     }
                 }
             });
@@ -263,11 +270,11 @@ public static partial class ResourceBuilderExtensions
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to create {BucketName} notification for {Queue} with {Events}")]
     private static partial void LogFailedBucketNotificationCreation(ILogger logger, string bucketName, string queue, IEnumerable<Amazon.S3.EventType> events, Exception exception);
 
-    private sealed record class BucketAnnotation(string BucketName, IResourceBuilder<ParameterResource>? Queue, List<Amazon.S3.EventType> EventTypes) : IResourceAnnotation;
+    private sealed record BucketAnnotation(string BucketName, IResourceBuilder<ParameterResource>? Queue, List<Amazon.S3.EventType> EventTypes) : IResourceAnnotation;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1401:Fields should be private", Justification = "This is for locking")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "This is required")]
-    private sealed class EnsureBucketLockAnnotation() : IResourceAnnotation
+    private sealed class EnsureBucketLockAnnotation : IResourceAnnotation
     {
         public int Check;
     }

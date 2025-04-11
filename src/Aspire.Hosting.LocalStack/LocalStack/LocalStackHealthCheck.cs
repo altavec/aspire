@@ -52,7 +52,7 @@ internal sealed class LocalStackHealthCheck(Func<HttpClient> httpClientFactory) 
             return new HealthCheckResult(context.Registration.FailureStatus, description: "Failed to read health status from local stack");
         }
 
-        if (ApplicationModel.LocalStackServerResource
+        if (LocalStackServerResource
             .GetServiceNames(this.Services)
             .FirstOrDefault(s => !healthCheck.Services.TryGetValue(s, out var value) || value is not ("available" or "running")) is { } serviceName)
         {

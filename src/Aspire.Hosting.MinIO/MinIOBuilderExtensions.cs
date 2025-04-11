@@ -6,7 +6,6 @@
 
 namespace Aspire.Hosting;
 
-using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.Configuration;
 
 /// <summary>
@@ -28,7 +27,7 @@ public static class MinIOBuilderExtensions
     /// <param name="configuration">The AWS configuration.</param>
     /// <returns>The builder for chaining.</returns>
     public static IDistributedApplicationBuilder AddAmazonS3<TResource>(this IDistributedApplicationBuilder builder, IResourceBuilder<TResource> resourceBuilder, AWS.IAWSSDKConfig configuration)
-        where TResource : MinIOServerResource => builder.AddAmazonS3<TResource>(resourceBuilder, configuration, "api", config => UpdateConfiguration(resourceBuilder.Resource, config));
+        where TResource : MinIOServerResource => builder.AddAmazonS3(resourceBuilder, configuration, "api", config => UpdateConfiguration(resourceBuilder.Resource, config));
 
     /// <summary>
     /// Adds Amazon S3 to the host.
@@ -39,7 +38,7 @@ public static class MinIOBuilderExtensions
     /// <param name="configuration">The AWS configuration.</param>
     /// <returns>The builder for chaining.</returns>
     public static IDistributedApplicationBuilder AddAmazonS3<TResource>(this IDistributedApplicationBuilder builder, TResource resource, AWS.IAWSSDKConfig configuration)
-        where TResource : MinIOServerResource => builder.AddAmazonS3<TResource>(resource, configuration, "api", config => UpdateConfiguration(resource, config));
+        where TResource : MinIOServerResource => builder.AddAmazonS3(resource, configuration, "api", config => UpdateConfiguration(resource, config));
 
     /// <summary>
     /// Injects service discovery information as environment variables from the project resource into the destination resource, using the source resource's name as the service name.
@@ -50,9 +49,9 @@ public static class MinIOBuilderExtensions
     /// <param name="source">The resource from which to extract service discovery information.</param>
     /// <returns>A reference to the <see cref="IResourceBuilder{T}"/>.</returns>
     public static IResourceBuilder<TDestination> WithReference<TDestination>(this IResourceBuilder<TDestination> builder, IResourceBuilder<MinIOServerResource> source)
-        where TDestination : ApplicationModel.IResourceWithEnvironment
+        where TDestination : IResourceWithEnvironment
     {
-        if (source is ApplicationModel.IResourceBuilder<IResourceWithServiceDiscovery> serviceDiscovery)
+        if (source is IResourceBuilder<IResourceWithServiceDiscovery> serviceDiscovery)
         {
             _ = builder.WithReference(serviceDiscovery);
         }
@@ -191,14 +190,14 @@ public static class MinIOBuilderExtensions
     /// </summary>
     /// <param name="builder">The <see cref="IDistributedApplicationBuilder"/>.</param>
     /// <param name="name">The name of the resource. This name will be used as the connection string name when referenced in a dependency.</param>
-    /// <param name="userName">The parameter used to provide the user name for the MinIO resource. If <see langword="null"/> a default value will be used.</param>
+    /// <param name="userName">The parameter used to provide the username for the MinIO resource. If <see langword="null"/> a default value will be used.</param>
     /// <param name="password">The parameter used to provide the administrator password for the MinIO resource. If <see langword="null"/> a random password will be generated.</param>
     /// <param name="apiPort">The API port.</param>
     /// <param name="consolePort">The console port.</param>
     /// <param name="config">The AWS config.</param>
     /// <returns>A reference to the <see cref="IResourceBuilder{T}"/>.</returns>
     [System.Runtime.CompilerServices.OverloadResolutionPriority(-1)]
-    public static IResourceBuilder<MinIOServerResource> AddMinIO(this IDistributedApplicationBuilder builder, string name, IResourceBuilder<ParameterResource>? userName = null, IResourceBuilder<ParameterResource>? password = null, int? apiPort = null, int? consolePort = null, Aspire.Hosting.AWS.IAWSSDKConfig? config = null) =>
+    public static IResourceBuilder<MinIOServerResource> AddMinIO(this IDistributedApplicationBuilder builder, string name, IResourceBuilder<ParameterResource>? userName = null, IResourceBuilder<ParameterResource>? password = null, int? apiPort = null, int? consolePort = null, AWS.IAWSSDKConfig? config = null) =>
         builder.AddMinIO(name, userName, password, apiPort, consolePort, config?.Region);
 
     /// <summary>
@@ -206,7 +205,7 @@ public static class MinIOBuilderExtensions
     /// </summary>
     /// <param name="builder">The <see cref="IDistributedApplicationBuilder"/>.</param>
     /// <param name="name">The name of the resource. This name will be used as the connection string name when referenced in a dependency.</param>
-    /// <param name="userName">The parameter used to provide the user name for the MinIO resource. If <see langword="null"/> a default value will be used.</param>
+    /// <param name="userName">The parameter used to provide the username for the MinIO resource. If <see langword="null"/> a default value will be used.</param>
     /// <param name="password">The parameter used to provide the administrator password for the MinIO resource. If <see langword="null"/> a random password will be generated.</param>
     /// <param name="apiPort">The API port.</param>
     /// <param name="consolePort">The console port.</param>
@@ -221,7 +220,7 @@ public static class MinIOBuilderExtensions
     /// </summary>
     /// <param name="builder">The <see cref="IDistributedApplicationBuilder"/>.</param>
     /// <param name="name">The name of the resource. This name will be used as the connection string name when referenced in a dependency.</param>
-    /// <param name="userName">The parameter used to provide the user name for the MinIO resource. If <see langword="null"/> a default value will be used.</param>
+    /// <param name="userName">The parameter used to provide the username for the MinIO resource. If <see langword="null"/> a default value will be used.</param>
     /// <param name="password">The parameter used to provide the administrator password for the MinIO resource. If <see langword="null"/> a random password will be generated.</param>
     /// <param name="apiPort">The API port.</param>
     /// <param name="consolePort">The console port.</param>
@@ -241,7 +240,7 @@ public static class MinIOBuilderExtensions
 
         var minIOServer = new MinIOServerResource(name, userName?.Resource, passwordParameter, region);
 
-        _ = builder.Eventing.Subscribe<Aspire.Hosting.ApplicationModel.ResourceReadyEvent>(minIOServer, AddUsers);
+        _ = builder.Eventing.Subscribe<ResourceReadyEvent>(minIOServer, AddUsers);
 
         return builder.AddResource(minIOServer)
             .WithImage(MinIO.MinIOContainerImageTags.Image, MinIO.MinIOContainerImageTags.Tag)
@@ -271,9 +270,9 @@ public static class MinIOBuilderExtensions
             .PublishAsContainer();
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S3011:Reflection should not be used to increase accessibility of classes, methods, or fields", Justification = "Checked")]
-        static async Task AddUsers(ApplicationModel.ResourceReadyEvent e, CancellationToken ct)
+        static async Task AddUsers(ResourceReadyEvent e, CancellationToken ct)
         {
-            var type = typeof(Aspire.Hosting.ApplicationModel.ResourceExtensions);
+            var type = typeof(ResourceExtensions);
             if (type.GetMethod("GetResolvedResourceNames", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic) is { } method
                 && method.Invoke(null, [e.Resource]) is IEnumerable<string> names
                 && names.FirstOrDefault() is { } name
@@ -337,8 +336,8 @@ public static class MinIOBuilderExtensions
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Minor Code Smell", "S101:Types should be named in PascalCase", Justification = "Checked")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "This supression is required.")]
-    private sealed class AWSProfileAnnotation : ApplicationModel.IResourceAnnotation
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "This suppression is required.")]
+    private sealed class AWSProfileAnnotation : IResourceAnnotation
     {
         public required AWS.AWSProfile Profile { get; init; }
     }
