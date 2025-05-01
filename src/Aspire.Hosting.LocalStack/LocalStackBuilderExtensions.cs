@@ -143,7 +143,7 @@ public static class LocalStackBuilderExtensions
                     context.EnvironmentVariables["LOCALSTACK_SERVICES"] = string.Join(',', localStack.GetServiceNames());
                 }
             })
-            .AddDockerSock()
+            .WithDockerSock()
             .PublishAsContainer();
 
         AddHealthCheck(resourceBuilder, Uri.UriSchemeHttp, Uri.UriSchemeHttp, services);
@@ -195,19 +195,34 @@ public static class LocalStackBuilderExtensions
         }
     }
 
-    private static IResourceBuilder<T> AddDockerSock<T>(this IResourceBuilder<T> builder)
+    private static IResourceBuilder<T> WithDockerSock<T>(this IResourceBuilder<T> builder)
         where T : ContainerResource
     {
-        var local = Environment.GetEnvironmentVariable("DOCKER_HOST") ?? "/var/run/docker.sock";
+        var local = GetDockerHost() ?? "/var/run/docker.sock";
         if (!OperatingSystem.IsLinux() || CheckSock(local))
         {
-            return AddDockerSockWithPath(builder, local);
+            AddDockerSockWithPath(builder, local);
+            return builder;
         }
 
         local = GetPodmanMachineSock();
-        return CheckSock(local)
-            ? AddDockerSockWithPath(builder, local)
-            : builder;
+        if (CheckSock(local))
+        {
+            AddDockerSockWithPath(builder, local);
+            return builder;
+        }
+
+        // Failed to find the socket
+        return builder;
+
+        static string? GetDockerHost()
+        {
+            return Environment.GetEnvironmentVariable("DOCKER_HOST") is { } value
+                   && Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                   && uri is { Scheme: "unix" }
+                ? uri.LocalPath
+                : default;
+        }
 
         static bool CheckSock([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? path)
         {
@@ -265,9 +280,9 @@ public static class LocalStackBuilderExtensions
             }
         }
 
-        static IResourceBuilder<T> AddDockerSockWithPath(IResourceBuilder<T> builder, string path)
+        static void AddDockerSockWithPath(IResourceBuilder<T> builder, string path)
         {
-            return builder.WithContainerRuntimeArgs("-v", $"{path}:/var/run/docker.sock:ro");
+            builder.WithContainerRuntimeArgs("-v", $"{path}:/var/run/docker.sock:ro");
         }
     }
 }
