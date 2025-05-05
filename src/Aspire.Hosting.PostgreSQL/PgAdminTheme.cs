@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------
-// <copyright file="Mode.cs" company="Altavec">
+// <copyright file="PgAdminTheme.cs" company="Altavec">
 // Copyright (c) Altavec. All rights reserved.
 // </copyright>
 // -----------------------------------------------------------------------
