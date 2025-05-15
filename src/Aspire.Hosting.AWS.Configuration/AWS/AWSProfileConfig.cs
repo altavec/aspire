@@ -18,7 +18,7 @@ public class AWSProfileConfig : IAWSProfileConfig
     public required string Name { get; init; }
 
     /// <inheritdoc/>
-    public ApplicationModel.ResourceAnnotationCollection Annotations { get; } = [];
+    public ResourceAnnotationCollection Annotations { get; } = [];
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is AWSProfileConfig profileConfig && this.Profiles.SequenceEqual(profileConfig.Profiles);

@@ -12,5 +12,5 @@ namespace Grpc.ApiService;
 public class ExampleServer : Altavec.Protobuf.Service.Example.ExampleBase
 {
     /// <inheritdoc />
-    public override Task<Google.Protobuf.WellKnownTypes.Empty> Accept(Altavec.Protobuf.Service.ActualMessage request, global::Grpc.Core.ServerCallContext context) => Task.FromResult(new Google.Protobuf.WellKnownTypes.Empty());
+    public override Task<Google.Protobuf.WellKnownTypes.Empty> Accept(Altavec.Protobuf.Service.ActualMessage request, Core.ServerCallContext context) => Task.FromResult(new Google.Protobuf.WellKnownTypes.Empty());
 }
