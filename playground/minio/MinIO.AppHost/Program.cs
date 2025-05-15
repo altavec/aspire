@@ -7,6 +7,7 @@
 using Microsoft.Extensions.DependencyInjection;
 
 const string ProfileName = "minio";
+const string BucketProfileName = "bucket";
 
 var builder = DistributedApplication.CreateBuilder(args);
 builder.Services.AddHttpClient();
@@ -15,7 +16,8 @@ var region = Amazon.RegionEndpoint.APSoutheast2;
 
 var profiles = builder.AddAWSProfileConfig()
     .AsConfigurationFile()
-    .WithProfile(ProfileName);
+    .WithProfile(ProfileName)
+    .WithProfile(BucketProfileName);
 
 var config = builder.AddAWSSDKConfig()
     .WithRegion(region)
@@ -29,14 +31,16 @@ var rabbitmq = builder
 
 var minio = builder
     .AddMinIO("minio", config: config)
+    .WithProfile(profiles, ProfileName)
     .WithReference(profiles)
     .WithAmqpReference(rabbitmq)
     .WithDataVolume();
 
-builder.AddAmazonS3(minio, config);
+_ = builder.AddAmazonS3(minio);
 
-minio.EnsureBucket(
+_ = minio.EnsureBucket(
     "aspire",
+    BucketProfileName,
     Amazon.S3.EventType.ObjectCreatedAll,
     Amazon.S3.EventType.ObjectRemovedAll,
     Amazon.S3.EventType.ObjectRestoreAll);
