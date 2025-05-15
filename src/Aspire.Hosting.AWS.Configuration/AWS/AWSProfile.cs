@@ -19,17 +19,17 @@ public sealed class AWSProfile
     /// <summary>
     /// Gets the access key ID.
     /// </summary>
-    public required ApplicationModel.ParameterResource AccessKeyId { get; init; }
+    public required ParameterResource AccessKeyId { get; init; }
 
     /// <summary>
     /// Gets the secret access key.
     /// </summary>
-    public required ApplicationModel.ParameterResource SecretAccessKey { get; init; }
+    public required ParameterResource SecretAccessKey { get; init; }
 
     /// <summary>
     /// Gets the session token.
     /// </summary>
-    public ApplicationModel.ParameterResource? SessionToken { get; init; }
+    public ParameterResource? SessionToken { get; init; }
 
     /// <inheritdoc/>
     public override bool Equals(object? obj)
@@ -54,12 +54,12 @@ public sealed class AWSProfile
     public override int GetHashCode()
     {
         int hash = 17;
-        hash = Add(hash, GetHashCode(this.Name));
-        hash = Add(hash, GetHashCode(this.AccessKeyId.Value));
-        hash = Add(hash, GetHashCode(this.SecretAccessKey.Value));
+        hash = Add(hash, GetHashCodeCore(this.Name));
+        hash = Add(hash, GetHashCodeCore(this.AccessKeyId.Value));
+        hash = Add(hash, GetHashCodeCore(this.SecretAccessKey.Value));
         if (this.SessionToken is { } sessionToken)
         {
-            hash = Add(hash, GetHashCode(sessionToken.Value));
+            hash = Add(hash, GetHashCodeCore(sessionToken.Value));
         }
 
         return hash;
@@ -72,7 +72,7 @@ public sealed class AWSProfile
             }
         }
 
-        static int GetHashCode(string str)
+        static int GetHashCodeCore(string str)
         {
             unchecked
             {

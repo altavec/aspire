@@ -13,6 +13,8 @@ using Microsoft.Extensions.Logging;
 /// <summary>
 /// Extensions for <c>MinIO</c>.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedMember.Global", Justification = "Public API")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "MemberCanBePrivate.Global", Justification = "Public API")]
 public static partial class MinIOBuilderExtensions
 {
     private const string UserEnvVarName = "MINIO_ROOT_USER";
