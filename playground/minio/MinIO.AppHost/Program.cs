@@ -33,9 +33,9 @@ var minio = builder
     .WithAmqpReference(rabbitmq)
     .WithDataVolume();
 
-builder.AddAmazonS3(minio, config);
+_ = builder.AddAmazonS3(minio, config);
 
-minio.EnsureBucket(
+_ = minio.EnsureBucket(
     "aspire",
     Amazon.S3.EventType.ObjectCreatedAll,
     Amazon.S3.EventType.ObjectRemovedAll,
