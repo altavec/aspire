@@ -395,9 +395,40 @@ public static partial class PostgresBuilderExtensions
         yield return $"ARG REGISTRY={DefaultRegistry}";
         yield return $"ARG IMAGE={DefaultImage}";
         yield return $"ARG TAG={DefaultTag}";
+
+        if (tle)
+        {
+            yield return "ARG TLE_BRANCH=main";
+        }
+
+        if (plrust)
+        {
+            yield return "ARG PL_RUST_BRANCH=main";
+        }
+
+        // build the TLE extension
+        if (tle)
+        {
+            yield return string.Empty;
+            foreach (var line in GetDockerfileLines($"{nameof(tle)}.build"))
+            {
+                yield return line;
+            }
+        }
+
+        // build PL/Rust
+        if (plrust)
+        {
+            yield return string.Empty;
+            foreach (var line in GetDockerfileLines($"{nameof(plrust)}.build"))
+            {
+                yield return line;
+            }
+        }
+
+        // build the actual container
         yield return string.Empty;
         yield return "FROM ${REGISTRY}/${IMAGE}:${TAG}";
-        yield return string.Empty;
 
         if (tle)
         {
@@ -415,14 +446,6 @@ public static partial class PostgresBuilderExtensions
             {
                 yield return line;
             }
-        }
-
-        if (tle)
-        {
-            // make sure that installing PL_TLE extensions works
-            yield return "USER root";
-            yield return "RUN mv /bin/sh /bin/sh.original && ln -s /bin/bash /bin/sh";
-            yield return "USER postgres";
         }
 
         static IEnumerable<string> GetDockerfileLines(string name)
