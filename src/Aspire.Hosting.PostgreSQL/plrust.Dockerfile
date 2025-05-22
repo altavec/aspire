@@ -1,11 +1,11 @@
 # modified from https://github.com/tcdi/plrust/blob/main/Dockerfile.try
 
-ARG RUST_BRANCH=main
+ARG PL_RUST_BRANCH=main
 
 # Install just enough to set up the official Postgres debian repository,
 # then install everything else needed for Rust and plrust
-COPY --chmod=544 llvm.sh /tmp/
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
+RUN --mount=type=bind,readwrite,source=llvm.sh,target=/tmp/llvm.sh \
+    echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -15,7 +15,7 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
         software-properties-common && \
     sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg >/dev/null && \
-    /tmp/llvm.sh && \
+    chmod +x /tmp/llvm.sh && /tmp/llvm.sh && \
     apt-get update -y -qq --fix-missing && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -36,12 +36,14 @@ RUN chmod a+rwx `$(which pg_config) --pkglibdir` `$(which pg_config) --sharedir`
 # and install toml so TOML files can be parsed later
 RUN gem install --no-document fpm toml
 
-RUN git clone -c advice.detachedHead=false https://github.com/altavec/plrust.git /plrust --branch ${RUST_BRANCH} && \
-    chown -R postgres /plrust
+RUN --mount=type=bind,source=0001-fix-version.patch,target=/tmp/0001-fix-version.patch \
+    git clone -c advice.detachedHead=false https://github.com/tcdi/plrust.git /plrust --depth 1 --branch ${PL_RUST_BRANCH} && \
+    chown -R postgres /plrust && \
+    cd /plrust && git apply /tmp/0001-fix-version.patch
 
 # The 'postgres' user is the default user that the official postgres image sets up
 USER postgres
-ENV USER=postgres
+ENV USER postgres
 
 # Copy in plrust source
 WORKDIR /plrust
@@ -60,7 +62,7 @@ EOF
 ## Install Rust
 COPY --chmod=555 rust.sh /tmp/
 RUN TOOLCHAIN_VER=`cat /tmp/.toolchain-ver` && \
-    /tmp/rust.sh -y --profile minimal --default-toolchain=$TOOLCHAIN_VER
+    /tmp/rust.sh -y --profile minimal --default-toolchain=$TOOLCHAIN_VER    
 ENV PATH="/var/lib/postgresql/.cargo/bin:${PATH}"
 
 RUN PGRX_VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[]|select(.name=="pgrx")|.version') && \
