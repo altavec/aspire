@@ -1,19 +1,11 @@
-ARG TLE_BRANCH=main
+COPY --from=tle-build /usr/share/postgresql/${PG_MAJOR}/extension /usr/share/postgresql/${PG_MAJOR}/extension
+COPY --from=tle-build /usr/lib/postgresql/${PG_MAJOR}/lib /usr/lib/postgresql/${PG_MAJOR}/lib
+COPY --from=tle-build --chown=postgres:postgres /pg_tle /pg_tle
 
-RUN apt-get update
-RUN apt-get install -y -qq postgresql-server-dev-$PG_MAJOR
-RUN apt-get install -y -qq \
-    git \
-    gcc \
-    make \
-    flex \
-    libsasl2-modules-gssapi-mit \
-    libkrb5-dev
+# get make to be able to install the examples
+RUN apt-get update && \
+    apt-get install -y -qq make && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/aws/pg_tle.git /pg_tle --branch ${TLE_BRANCH} && \
-    chown -R postgres /pg_tle
-
-RUN PG_CONFIG=$(which pg_config) && \
-    cd /pg_tle && \
-    make && \
-    make install
+# enable making the examples by linking /bin/sh to /bin/bash
+RUN mv /bin/sh /bin/sh.original && ln -s /bin/bash /bin/sh

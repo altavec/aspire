@@ -453,52 +453,115 @@ public static partial class PostgresBuilderExtensions
 
     private static IEnumerable<string> GetDockerfileContents(bool tle, bool plrust)
     {
-        yield return $"ARG REGISTRY={DefaultRegistry}";
-        yield return $"ARG IMAGE={DefaultImage}";
-        yield return $"ARG TAG={DefaultTag}";
-        yield return string.Empty;
-        yield return "FROM ${REGISTRY}/${IMAGE}:${TAG}";
-        yield return string.Empty;
+        return GetArguments(tle, plrust)
+            .Concat(GetBuildInstructions(tle, plrust))
+            .Concat(GetInstructions(tle, plrust));
 
-        if (ZScaler.IsRunning())
+        static IEnumerable<string> GetDockerfileLines(string name)
         {
-            yield return string.Empty;
-            foreach (var line in ZScaler.GetDockerfileLines())
-            {
-                yield return line;
-            }
-        }
+            using var reader = new StreamReader(GetManifestResourceStream($"{name}.Dockerfile"));
 
-        if (tle)
-        {
-            using var stream = typeof(PgAdminTheme).Assembly.GetManifestResourceStream(typeof(PgAdminTheme), $"{nameof(tle)}.Dockerfile") ?? throw new InvalidOperationException();
-            using var reader = new StreamReader(stream);
-
-            yield return string.Empty;
             while (reader.ReadLine() is { } line)
             {
                 yield return line;
             }
         }
 
-        if (plrust)
+        static IEnumerable<string> GetArguments(bool tle, bool plrust)
         {
-            using var stream = typeof(PgAdminTheme).Assembly.GetManifestResourceStream(typeof(PgAdminTheme), $"{nameof(plrust)}.Dockerfile") ?? throw new InvalidOperationException();
-            using var reader = new StreamReader(stream);
+            yield return $"ARG REGISTRY={DefaultRegistry}";
+            yield return $"ARG IMAGE={DefaultImage}";
+            yield return $"ARG TAG={DefaultTag}";
 
-            yield return string.Empty;
-            while (reader.ReadLine() is { } line)
+            if (tle)
             {
-                yield return line;
+                yield return "ARG TLE_BRANCH=main";
+            }
+
+            if (plrust)
+            {
+                yield return "ARG PL_RUST_BRANCH=main";
             }
         }
 
-        if (tle)
+        static IEnumerable<string> GetBuildInstructions(bool tle, bool plrust)
         {
-            // make sure that installing PL_TLE extensions works
-            yield return "USER root";
-            yield return "RUN mv /bin/sh /bin/sh.original && ln -s /bin/bash /bin/sh";
-            yield return "USER postgres";
+            var zscaler = ZScaler.IsRunning;
+
+            // build the TLE extension
+            if (tle)
+            {
+                yield return string.Empty;
+                foreach (var line in GetDockerfileLines($"{nameof(tle)}.build"))
+                {
+                    yield return line;
+
+                    if (zscaler && line.StartsWith("FROM", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // insert ZScaler lines
+                        yield return string.Empty;
+                        foreach (var zscalerLine in ZScaler.GetDockerfileLines())
+                        {
+                            yield return zscalerLine;
+                        }
+                    }
+                }
+            }
+
+            // build PL/Rust
+            if (plrust)
+            {
+                yield return string.Empty;
+                foreach (var line in GetDockerfileLines($"{nameof(plrust)}.build"))
+                {
+                    yield return line;
+
+                    if (zscaler && line.StartsWith("FROM", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // insert ZScaler lines
+                        yield return string.Empty;
+                        foreach (var zscalerLine in ZScaler.GetDockerfileLines())
+                        {
+                            yield return zscalerLine;
+                        }
+                    }
+                }
+            }
+        }
+
+        static IEnumerable<string> GetInstructions(bool tle, bool plrust)
+        {
+            // build the actual container
+            yield return string.Empty;
+            yield return "FROM ${REGISTRY}/${IMAGE}:${TAG}";
+
+            if (ZScaler.IsRunning)
+            {
+                // insert ZScaler lines
+                yield return string.Empty;
+                foreach (var line in ZScaler.GetDockerfileLines())
+                {
+                    yield return line;
+                }
+            }
+
+            if (tle)
+            {
+                yield return string.Empty;
+                foreach (var line in GetDockerfileLines(nameof(tle)))
+                {
+                    yield return line;
+                }
+            }
+
+            if (plrust)
+            {
+                yield return string.Empty;
+                foreach (var line in GetDockerfileLines(nameof(plrust)))
+                {
+                    yield return line;
+                }
+            }
         }
     }
 
