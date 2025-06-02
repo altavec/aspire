@@ -131,7 +131,7 @@ public static partial class PostgresBuilderExtensions
     public static IResourceBuilder<T> WithTle<T>(this IResourceBuilder<T> builder, string? version = default)
         where T : core::Aspire.Hosting.ApplicationModel.PostgresServerResource =>
         builder
-            .SetupDockerfile()
+            .SetupContainerfile()
             .WithAnnotation(new TleAnnotation(version ?? "v1.5.0"))
             .WithContainerFiles(
                 "/pg_tle/examples",
@@ -163,7 +163,17 @@ public static partial class PostgresBuilderExtensions
     /// <param name="branch">The branch.</param>
     /// <returns>The input builder.</returns>
     public static IResourceBuilder<T> WithPlRust<T>(this IResourceBuilder<T> builder, string? branch = default)
-        where T : core::Aspire.Hosting.ApplicationModel.PostgresServerResource => builder.SetupDockerfile().WithAnnotation(new RustAnnotation(branch ?? "v1.2.8"));
+        where T : core::Aspire.Hosting.ApplicationModel.PostgresServerResource => builder.SetupContainerfile().WithAnnotation(new RustAnnotation(branch ?? "v1.2.8"));
+
+    /// <summary>
+    /// Adds <c>pldotnet</c> support for the database.
+    /// </summary>
+    /// <typeparam name="T">The type of resource.</typeparam>
+    /// <param name="builder">The builder.</param>
+    /// <param name="branch">The branch.</param>
+    /// <returns>The input builder.</returns>
+    public static IResourceBuilder<T> WithPlDotnet<T>(this IResourceBuilder<T> builder, string? branch = default)
+        where T : core::Aspire.Hosting.ApplicationModel.PostgresServerResource => builder.SetupContainerfile().WithAnnotation(new DotnetAnnotation(branch ?? "tag-v0.99-rc1"));
 
     /// <summary>
     /// Installs the TLE extension for the database.
@@ -194,7 +204,7 @@ public static partial class PostgresBuilderExtensions
         return builder;
     }
 
-    private static IResourceBuilder<T> SetupDockerfile<T>(this IResourceBuilder<T> builder)
+    private static IResourceBuilder<T> SetupContainerfile<T>(this IResourceBuilder<T> builder)
         where T : core::Aspire.Hosting.ApplicationModel.PostgresServerResource
     {
         // see if this has been set up already
@@ -309,10 +319,22 @@ public static partial class PostgresBuilderExtensions
                         await WriteManifestResource("0001-fix-version.patch", dockerfileBuild.ContextPath, cancellationToken).ConfigureAwait(false);
                     }
 
+                    var pldotnet = false;
+                    if (evt.Resource.TryGetLastAnnotation<DotnetAnnotation>(out var dotnetAnnotation))
+                    {
+                        pldotnet = true;
+                        dockerfileBuild.BuildArguments["PL_DOTNET_BRANCH"] = dotnetAnnotation.Branch;
+                    }
+
                     // write out the docker file
+                    if (Path.GetDirectoryName(dockerfileBuild.DockerfilePath) is { } dockerfileDirectory)
+                    {
+                        Directory.CreateDirectory(dockerfileDirectory);
+                    }
+
                     await File.WriteAllLinesAsync(
                         dockerfileBuild.DockerfilePath,
-                        GetDockerfileContents(tle, plrust),
+                        GetContainerfileContents(tle, plrust, pldotnet),
                         cancellationToken).ConfigureAwait(false);
 
                     static async Task WriteManifestResource(string name, string destination, CancellationToken cancellationToken)
@@ -451,15 +473,15 @@ public static partial class PostgresBuilderExtensions
 
     private static Stream GetManifestResourceStream(string name) => typeof(PostgresBuilderExtensions).Assembly.GetManifestResourceStream(typeof(PostgresBuilderExtensions), name) ?? throw new InvalidOperationException();
 
-    private static IEnumerable<string> GetDockerfileContents(bool tle, bool plrust)
+    private static IEnumerable<string> GetContainerfileContents(bool tle, bool plrust, bool pldotnet)
     {
-        return GetArguments(tle, plrust)
-            .Concat(GetBuildInstructions(tle, plrust))
-            .Concat(GetInstructions(tle, plrust));
+        return GetArguments(tle, plrust, pldotnet)
+            .Concat(GetBuildInstructions(tle, plrust, pldotnet))
+            .Concat(GetInstructions(tle, plrust, pldotnet));
 
-        static IEnumerable<string> GetDockerfileLines(string name)
+        static IEnumerable<string> GetContainerfileLines(string name)
         {
-            using var reader = new StreamReader(GetManifestResourceStream($"{name}.Dockerfile"));
+            using var reader = new StreamReader(GetManifestResourceStream($"{name}.Containerfile"));
 
             while (reader.ReadLine() is { } line)
             {
@@ -467,7 +489,7 @@ public static partial class PostgresBuilderExtensions
             }
         }
 
-        static IEnumerable<string> GetArguments(bool tle, bool plrust)
+        static IEnumerable<string> GetArguments(bool tle, bool plrust, bool pldotnet)
         {
             yield return $"ARG REGISTRY={DefaultRegistry}";
             yield return $"ARG IMAGE={DefaultImage}";
@@ -482,9 +504,14 @@ public static partial class PostgresBuilderExtensions
             {
                 yield return "ARG PL_RUST_BRANCH=main";
             }
+
+            if (pldotnet)
+            {
+                yield return "ARG PL_DOTNET_BRANCH=master";
+            }
         }
 
-        static IEnumerable<string> GetBuildInstructions(bool tle, bool plrust)
+        static IEnumerable<string> GetBuildInstructions(bool tle, bool plrust, bool pldotnet)
         {
             var zscaler = ZScaler.IsRunning;
 
@@ -492,7 +519,7 @@ public static partial class PostgresBuilderExtensions
             if (tle)
             {
                 yield return string.Empty;
-                foreach (var line in GetDockerfileLines($"{nameof(tle)}.build"))
+                foreach (var line in GetContainerfileLines($"{nameof(tle)}.build"))
                 {
                     yield return line;
 
@@ -500,7 +527,7 @@ public static partial class PostgresBuilderExtensions
                     {
                         // insert ZScaler lines
                         yield return string.Empty;
-                        foreach (var zscalerLine in ZScaler.GetDockerfileLines())
+                        foreach (var zscalerLine in ZScaler.GetContainerfileLines())
                         {
                             yield return zscalerLine;
                         }
@@ -512,7 +539,7 @@ public static partial class PostgresBuilderExtensions
             if (plrust)
             {
                 yield return string.Empty;
-                foreach (var line in GetDockerfileLines($"{nameof(plrust)}.build"))
+                foreach (var line in GetContainerfileLines($"{nameof(plrust)}.build"))
                 {
                     yield return line;
 
@@ -520,7 +547,27 @@ public static partial class PostgresBuilderExtensions
                     {
                         // insert ZScaler lines
                         yield return string.Empty;
-                        foreach (var zscalerLine in ZScaler.GetDockerfileLines())
+                        foreach (var zscalerLine in ZScaler.GetContainerfileLines())
+                        {
+                            yield return zscalerLine;
+                        }
+                    }
+                }
+            }
+
+            // build PL/Dotnet
+            if (pldotnet)
+            {
+                yield return string.Empty;
+                foreach (var line in GetContainerfileLines($"{nameof(pldotnet)}.build"))
+                {
+                    yield return line;
+
+                    if (zscaler && line.StartsWith("FROM", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // insert ZScaler lines
+                        yield return string.Empty;
+                        foreach (var zscalerLine in ZScaler.GetContainerfileLines())
                         {
                             yield return zscalerLine;
                         }
@@ -529,7 +576,7 @@ public static partial class PostgresBuilderExtensions
             }
         }
 
-        static IEnumerable<string> GetInstructions(bool tle, bool plrust)
+        static IEnumerable<string> GetInstructions(bool tle, bool plrust, bool pldotnet)
         {
             // build the actual container
             yield return string.Empty;
@@ -539,7 +586,7 @@ public static partial class PostgresBuilderExtensions
             {
                 // insert ZScaler lines
                 yield return string.Empty;
-                foreach (var line in ZScaler.GetDockerfileLines())
+                foreach (var line in ZScaler.GetContainerfileLines())
                 {
                     yield return line;
                 }
@@ -548,7 +595,7 @@ public static partial class PostgresBuilderExtensions
             if (tle)
             {
                 yield return string.Empty;
-                foreach (var line in GetDockerfileLines(nameof(tle)))
+                foreach (var line in GetContainerfileLines(nameof(tle)))
                 {
                     yield return line;
                 }
@@ -557,7 +604,16 @@ public static partial class PostgresBuilderExtensions
             if (plrust)
             {
                 yield return string.Empty;
-                foreach (var line in GetDockerfileLines(nameof(plrust)))
+                foreach (var line in GetContainerfileLines(nameof(plrust)))
+                {
+                    yield return line;
+                }
+            }
+
+            if (pldotnet)
+            {
+                yield return string.Empty;
+                foreach (var line in GetContainerfileLines(nameof(pldotnet)))
                 {
                     yield return line;
                 }
@@ -650,4 +706,6 @@ public static partial class PostgresBuilderExtensions
     private sealed record TleExtensionAnnotation(string Name) : IResourceAnnotation;
 
     private sealed record RustAnnotation(string Branch) : PostgresAnnotation;
+
+    private sealed record DotnetAnnotation(string Branch) : PostgresAnnotation;
 }
