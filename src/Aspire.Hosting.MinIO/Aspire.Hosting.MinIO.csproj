@@ -17,10 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aspire.Hosting.AWS.S3\Aspire.Hosting.AWS.S3.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\Shared\ContainerResources.cs" Link="ApplicationModel\%(FileName)%(Extension)" />
+    <ProjectReference Include="..\Aspire.Hosting.Containers.Extensions\Aspire.Hosting.Containers.Extensions.csproj" />
   </ItemGroup>
 
   <PropertyGroup Label="Packaging">
