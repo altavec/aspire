@@ -14,14 +14,13 @@ var db1 = builder
     .WithDataVolume()
     .WithTle()
     .WithRust()
-    .WithDotnet();
-
-db1.WithPgAdmin(container =>
-    container
-        .WaitFor(db1)
-        .WithTheme(PgAdminTheme.System)
-        .WithImageTag("9")
-        .WithImagePullPolicy(ImagePullPolicy.Always));
+    .WithDotnet()
+    .WithPgAdmin(static (container, postgres) =>
+        container
+            .WaitFor(postgres)
+            .WithTheme(PgAdminTheme.System)
+            .WithImageTag("9")
+            .WithImagePullPolicy(ImagePullPolicy.Always));
 
 var database = db1.AddDatabase("db1-database")
     .WithTleExtension("uuid_v7");
