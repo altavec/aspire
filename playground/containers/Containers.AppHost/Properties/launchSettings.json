@@ -1,29 +1,33 @@
 {
-  "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
     "https": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:17070;http://localhost:15231",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21005",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22190"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:17070;http://localhost:15231"
     },
     "http": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "http://localhost:15231",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19203",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20063"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:15231"
+    },
+    "publish": {
+      "commandName": "Project",
+      "commandLineArgs": "--operation publish --publisher default --output-path $(Temp)/containers-apphost/"
     }
-  }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
 }

@@ -10,6 +10,7 @@ namespace Aspire.Hosting;
 /// Helpers for <see href="https://www.zscaler.com/" />.
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "MemberCanBePrivate.Global", Justification = "Public API")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:Remove unnecessary suppression", Justification = "This is required")]
 public static class ZScaler
 {
     /// <summary>
